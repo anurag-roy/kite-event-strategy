@@ -10,7 +10,7 @@ const trimmedInstrumentMapper = (i: Instrument) => {
 
 export const getStocks = (futTradingsymbol: string, target: number) => {
   const instruments = JSON.parse(
-    readFileSync('my-instruments.json', 'utf-8')
+    readFileSync('instruments.json', 'utf-8')
   ) as Instrument[];
 
   const mainStock = instruments.find(

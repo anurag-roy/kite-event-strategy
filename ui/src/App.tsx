@@ -1,12 +1,8 @@
 import { InformationCircleIcon } from '@heroicons/react/24/solid';
 import { FormEvent } from 'react';
-import instruments from '../../my-instruments.json';
+import instrumentOptions from '../instrumentOptions.json';
 import { ComboBoxInput } from './components/ComboBoxInput';
 import { NumberInput } from './components/NumberInput';
-
-const instrumentOptions = instruments
-  .filter((i) => i.instrument_type === 'FUT')
-  .map((i) => i.tradingsymbol);
 
 export function App() {
   const onSubmitHandler = async (event: FormEvent<HTMLFormElement>) => {

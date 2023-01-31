@@ -22,9 +22,6 @@ app.use('/login', async (req, res) => {
 
   writeFileSync('accessToken.txt', result.access_token);
 
-  const instruments = await kc.getInstruments(['NFO']);
-  writeFileSync('instruments.json', JSON.stringify(instruments));
-
   res.send('Login flow successful!');
   server.close();
 });

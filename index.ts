@@ -33,7 +33,7 @@ app.post('/entry', async (req, res) => {
   const {
     stock,
     target,
-    entryPriceDifference: targetDifference,
+    entryPriceDifference: epd,
     quantity,
     limitPriceDifference: lpd,
   } = req.body as EntryRequest;
@@ -65,10 +65,7 @@ app.post('/entry', async (req, res) => {
             const ltp = t.last_price;
 
             // Check entry condition
-            if (
-              ltp >= target - targetDifference &&
-              ltp <= target + targetDifference
-            ) {
+            if (ltp >= target - epd && ltp <= target + epd) {
               console.log('Entry condition satisfied for ltp', ltp);
               try {
                 console.log(
