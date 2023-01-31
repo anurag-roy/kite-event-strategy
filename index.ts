@@ -1,7 +1,6 @@
 import express from 'express';
 import { KiteConnect, KiteTicker } from 'kiteconnect';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { setInterval } from 'node:timers';
 import env from './env.json';
 import { EntryRequest } from './types/index.js';
@@ -14,7 +13,7 @@ const kc = new KiteConnect({
 });
 
 const app = express();
-app.use(express.static(path.join('ui', 'dist')));
+app.use(express.static('dist'));
 app.use(express.json());
 
 app.post('/entry', async (req, res) => {
