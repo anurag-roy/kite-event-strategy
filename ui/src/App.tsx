@@ -1,23 +1,56 @@
 import { InformationCircleIcon } from '@heroicons/react/24/solid';
 import { FormEvent } from 'react';
+import instruments from '../../my-instruments.json';
 import { ComboBoxInput } from './components/ComboBoxInput';
 import { NumberInput } from './components/NumberInput';
 
-export function App() {
-  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    console.log('event is ', event);
-  };
+const instrumentOptions = instruments
+  .filter((i) => i.instrument_type === 'FUT')
+  .map((i) => i.tradingsymbol);
 
-  const stockNames = ['A', 'B', 'C'];
+export function App() {
+  const onSubmitHandler = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const submitter = (event.nativeEvent as SubmitEvent).submitter!;
+    const formAction = submitter.getAttribute('formaction')!;
+
+    const formData = new FormData(event.currentTarget);
+    for (let [name, value] of Array.from(formData.entries())) {
+      if (value === '') formData.delete(name);
+    }
+    const requestBody = Object.fromEntries(formData) as any;
+    for (let [name, value] of Object.entries(requestBody)) {
+      if (name !== 'stock') requestBody[name] = Number(value);
+    }
+    console.log('requestBody', requestBody);
+    try {
+      const res = await fetch(formAction, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      if (res.ok) {
+        alert('Triggered successfully! Please check console.');
+        window.location.reload();
+      } else {
+        alert('Some error occurred');
+      }
+    } catch (error) {
+      console.error('Error occurred while triggering API', error);
+      alert('Some error occurred');
+    }
+  };
 
   return (
     <form
-      onSubmit={handleFormSubmit}
       className="max-w-4xl mx-auto px-4 py-8 space-y-12"
+      onSubmit={onSubmitHandler}
     >
       <div className="flex gap-12">
-        <ComboBoxInput items={stockNames} name="stock" />
+        <ComboBoxInput items={instrumentOptions} name="stock" />
         <NumberInput name="target" isRequired={true} />
         <NumberInput name="quantity" isRequired={true} />
       </div>
@@ -32,7 +65,7 @@ export function App() {
         <div className="flex gap-12">
           <NumberInput name="entryPriceDifference" />
           <NumberInput name="limitPriceDifference" />
-          <button type="submit" className="form-button">
+          <button type="submit" formAction="/entry" className="form-button">
             Trigger Entry Watch
           </button>
         </div>
@@ -48,7 +81,7 @@ export function App() {
         <div className="flex gap-12">
           <NumberInput name="exit" />
           <NumberInput name="exitPriceDifference" />
-          <button type="submit" className="form-button">
+          <button type="submit" formAction="/exit" className="form-button">
             Trigger Exit Watch
           </button>
         </div>

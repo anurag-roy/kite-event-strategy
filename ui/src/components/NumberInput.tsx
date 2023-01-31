@@ -17,6 +17,7 @@ export function NumberInput({ name, isRequired }: NumberInputProps) {
           name={name}
           id={name}
           required={isRequired ? isRequired : undefined}
+          step={0.01}
           className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block sm:text-sm border-gray-300 rounded-md"
         />
       </div>

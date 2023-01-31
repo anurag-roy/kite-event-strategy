@@ -1,9 +1,11 @@
 import express from 'express';
 import { KiteConnect, KiteTicker } from 'kiteconnect';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { setInterval } from 'node:timers';
 import env from './env.json';
 import { EntryRequest } from './types/index.js';
+import { getStocks } from './util.js';
 
 const accessToken = readFileSync('./accessToken.txt', 'utf-8');
 const kc = new KiteConnect({
@@ -12,6 +14,7 @@ const kc = new KiteConnect({
 });
 
 const app = express();
+app.use(express.static(path.join('ui', 'dist')));
 app.use(express.json());
 
 app.post('/entry', async (req, res) => {
@@ -27,9 +30,20 @@ app.post('/entry', async (req, res) => {
   let leg4Complete = false;
 
   // Get data from request body
-  const { mainStock, options, target, targetDifference, quantity, lpd } =
-    req.body as EntryRequest;
-  const { nspMinusOnePE, nspCE, nspPE, nspPlusOneCE } = options;
+  const {
+    stock,
+    target,
+    entryPriceDifference: targetDifference,
+    quantity,
+    limitPriceDifference: lpd,
+  } = req.body as EntryRequest;
+
+  console.log('req.body', req.body);
+
+  const { mainStock, nspMinusOnePE, nspCE, nspPE, nspPlusOneCE } = getStocks(
+    stock,
+    target
+  );
 
   const ticker = new KiteTicker({
     api_key: env.API_KEY,
@@ -49,7 +63,6 @@ app.post('/entry', async (req, res) => {
         switch (t.instrument_token) {
           case mainStock.token:
             const ltp = t.last_price;
-            console.log(mainStock.tradingsymbol, ltp);
 
             // Check entry condition
             if (
@@ -217,13 +230,11 @@ app.post('/entry', async (req, res) => {
           case nspMinusOnePE.token:
             if (t?.depth?.buy?.[0]?.price) {
               nspMinusOnePEBid = t.depth.buy[0].price;
-              console.log(nspMinusOnePE.tradingsymbol, nspMinusOnePEBid);
             }
             break;
           case nspPlusOneCE.token:
             if (t?.depth?.buy?.[0]?.price) {
               nspPlusOneCEBid = t.depth.buy[0].price;
-              console.log(nspPlusOneCE.tradingsymbol, nspMinusOnePEBid);
             }
             break;
           default:
@@ -243,8 +254,17 @@ app.post('/exit', async (req, res) => {
   let nspPEBid = 0;
 
   // Get data from request body
-  const { options, quantity, exit, epd } = req.body as EntryRequest;
-  const { nspMinusOnePE, nspCE, nspPE, nspPlusOneCE } = options;
+  const {
+    stock,
+    target,
+    quantity,
+    exit,
+    exitPriceDifference: epd,
+  } = req.body as EntryRequest;
+  const { nspMinusOnePE, nspCE, nspPE, nspPlusOneCE } = getStocks(
+    stock,
+    target
+  );
   const tokensToSubscribe = [
     nspMinusOnePE.token,
     nspCE.token,
@@ -293,13 +313,16 @@ app.post('/exit', async (req, res) => {
     });
 
     setInterval(async () => {
+      console.time('getPositions');
       const { day: dayPositions } = await kc.getPositions();
+      console.timeEnd('getPositions');
       const autosum = dayPositions.reduce((sum, currentPos) => {
         if (tokensToSubscribe.includes(currentPos.instrument_token)) {
           return sum + currentPos.pnl;
         }
         return sum;
       }, 0);
+
       if (autosum >= exit || autosum <= -1 * exit) {
         console.log('Exit condition satisfied for autosum', autosum);
 

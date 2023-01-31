@@ -35,7 +35,7 @@ export function ComboBoxInput({
       <div className="relative mt-1">
         <Combobox.Input
           name={name}
-          className="rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+          className=" min-w-[20rem] rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
           onChange={(event) => setQuery(event.target.value)}
           required={true}
         />

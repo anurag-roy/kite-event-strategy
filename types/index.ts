@@ -3,18 +3,27 @@ type Stock = {
   token: number;
 };
 
+export type Instrument = {
+  instrument_token: string;
+  exchange_token: string;
+  tradingsymbol: string;
+  name: string;
+  last_price: number;
+  expiry: string;
+  strike: number;
+  tick_size: number;
+  lot_size: number;
+  instrument_type: string;
+  segment: string;
+  exchange: string;
+};
+
 export type EntryRequest = {
-  mainStock: Stock;
-  options: {
-    nspMinusOnePE: Stock;
-    nspCE: Stock;
-    nspPE: Stock;
-    nspPlusOneCE: Stock;
-  };
+  stock: string;
   target: number;
-  targetDifference: number;
   quantity: number;
-  lpd: number;
+  entryPriceDifference: number;
+  limitPriceDifference: number;
   exit: number;
-  epd: number;
+  exitPriceDifference: number;
 };
