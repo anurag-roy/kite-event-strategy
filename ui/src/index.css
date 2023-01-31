@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.form-button {
+  @apply px-4 py-2 self-end ml-auto text-base font-medium rounded-full text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500;
+  background-image: linear-gradient(
+    45deg,
+    theme('colors.blue.600') 0,
+    theme('colors.blue.400') 50%,
+    theme('colors.blue.600') 100%
+  );
+  transition: background-position 0.4s;
+  background-size: 300% auto;
+  background-position: 0;
+}
+
+.form-button:active {
+  background: theme('colors.blue.400');
+}
+
+.form-button:hover,
+.form-button:focus {
+  background-position: 100%;
+}
