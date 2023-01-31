@@ -4,5 +4,8 @@
 [x] Set order postback handler
 [x] Do similar thing as above for leg 3 and leg 4
 [x] Exit condition
+[x] Console logs
+[x] Try catches
+[x] Review
 
 [] UI Form and selection
