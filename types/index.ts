@@ -4,7 +4,6 @@ type Stock = {
 };
 
 export type EntryRequest = {
-  orderType: 'MIS' | 'CNC';
   mainStock: Stock;
   options: {
     nspMinusOnePE: Stock;
