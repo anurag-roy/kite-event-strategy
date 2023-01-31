@@ -132,3 +132,4 @@ dist
 env.json
 accessToken.txt
 instruments.json
+*.zip

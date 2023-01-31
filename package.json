@@ -2,12 +2,13 @@
   "name": "kite-event-strategy",
   "type": "module",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
     "login": "tsx login.ts",
     "start": "tsx index.ts",
-    "prepareData": "tsx scripts/prepareData.ts"
+    "prepareData": "tsx scripts/prepareData.ts",
+    "build": "rm -rf dist && pnpm --filter ui build && cp -r ui/dist dist",
+    "zip": "./zip.sh"
   },
   "keywords": [],
   "author": "Anurag Roy <anuragroy@duck.com> (https://anuragroy.dev/)",
