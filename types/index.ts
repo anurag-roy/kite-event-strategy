@@ -12,6 +12,7 @@ export type EntryRequest = {
     nspPlusOneCE: Stock;
   };
   target: number;
+  targetDifference: number;
   quantity: number;
   lpd: number;
   exit: number;
