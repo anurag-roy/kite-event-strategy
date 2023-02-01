@@ -40,8 +40,6 @@ app.post('/entry', async (req, res) => {
     limitPriceDifference: lpd,
   } = req.body as EntryRequest;
 
-  console.log('req.body', req.body);
-
   // Get nsp - 1, nsp and nsp + 1 stocks
   const { mainStock, nspMinusOnePE, nspCE, nspPE, nspPlusOneCE } = getStocks(
     stock,
@@ -95,17 +93,18 @@ app.post('/entry', async (req, res) => {
           case mainStock.token:
             ltp = t.last_price;
             console.log(
-              'LTP is',
-              ltp,
-              'Entry ranges are',
-              target - epd,
-              target + epd
+              `LTP: ${ltp}, Target: ${target}, Entry Price Diff: ${epd}`
             );
             // Check entry condition
             if (ltp >= target - epd && ltp <= target + epd && !entrySatisfied) {
-              console.log('Entry condition satisfied for ltp', ltp);
+              console.log(
+                `Entry condition satisfied for LTP: ${ltp}, Target: ${target}, Entry Price Diff: ${epd}`
+              );
               // If any of the bid is less than 0.05, skip this one
               if (nspMinusOnePEBid < 0.05 || nspPEAsk < 0.05) {
+                console.log(
+                  'One or more prices are below 0.05, not executing order'
+                );
                 continue;
               }
               // All is good, proceed to order
@@ -123,6 +122,7 @@ app.post('/entry', async (req, res) => {
                     nspPEAsk + lpd
                   } and quantity ${quantity}`
                 );
+                console.log();
                 const orderResults = await Promise.all([
                   kc.placeOrder('regular', {
                     exchange: 'NFO',

@@ -4,15 +4,17 @@ import path from 'node:path';
 import env from '../env.json';
 
 const ALLOWED_STOCKS = [
-  'NIFTY',
-  'ACC',
-  'BEL',
+  'CUB',
   'FEDERALBNK',
-  'IOC',
-  'MANAPPURAM',
+  'IBULHSGFIN',
+  'IEX',
+  'MOTHERSON',
   'MRF',
+  'PFC',
+  'OFSS',
+  'RAIN',
+  'SRF',
   'SAIL',
-  'TATAMOTORS',
   'TATASTEEL',
 ];
 
@@ -22,20 +24,23 @@ const kc = new KiteConnect({
   api_key: env.API_KEY,
 });
 
-const instruments = await kc.getInstruments(['NFO']);
-const filteredInstruments = instruments.filter(
+const options = await kc.getInstruments(['NFO']);
+const filteredOptions = options.filter(
   (i) =>
     ALLOWED_STOCKS.includes(i.name) &&
     EXPIRY_DATES.some((d) => i?.expiry?.toISOString().startsWith(d))
 );
 
-const instrumentOptions = filteredInstruments
-  .filter((i) => i.instrument_type === 'FUT')
-  .map((i) => i.tradingsymbol);
+const nseInstruments = await kc.getInstruments(['NSE']);
+const filteredEquities = nseInstruments.filter(
+  (i) => i.instrument_type === 'EQ' && ALLOWED_STOCKS.includes(i.tradingsymbol)
+);
+const uiDropwdownOptions = filteredEquities.map((e) => e.tradingsymbol);
 
-writeFileSync('instruments.json', JSON.stringify(filteredInstruments), 'utf-8');
+writeFileSync('options.json', JSON.stringify(filteredOptions), 'utf-8');
+writeFileSync('equities.json', JSON.stringify(filteredEquities), 'utf-8');
 writeFileSync(
-  path.join('ui', 'instrumentOptions.json'),
-  JSON.stringify(instrumentOptions),
+  path.join('ui', 'dropdownOptions.json'),
+  JSON.stringify(uiDropwdownOptions),
   'utf-8'
 );

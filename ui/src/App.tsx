@@ -1,6 +1,6 @@
 import { InformationCircleIcon } from '@heroicons/react/24/solid';
 import { FormEvent } from 'react';
-import instrumentOptions from '../instrumentOptions.json';
+import stockDropdownOptions from '../dropdownOptions.json';
 import { ComboBoxInput } from './components/ComboBoxInput';
 import { NumberInput } from './components/NumberInput';
 
@@ -46,7 +46,7 @@ export function App() {
       onSubmit={onSubmitHandler}
     >
       <div className="flex gap-12">
-        <ComboBoxInput items={instrumentOptions} name="stock" />
+        <ComboBoxInput items={stockDropdownOptions} name="stock" />
         <NumberInput name="target" isRequired={true} />
         <NumberInput name="quantity" isRequired={true} />
       </div>
