@@ -1,8 +1,24 @@
 import { readFileSync } from 'node:fs';
 import { Instrument } from './types/index.js';
 
+const NIFTY50 = {
+  instrument_token: '256265',
+  exchange_token: '1001',
+  tradingsymbol: 'NIFTY 50',
+  name: 'NIFTY',
+  last_price: 0,
+  expiry: '',
+  strike: 0,
+  tick_size: 0,
+  lot_size: 0,
+  instrument_type: 'EQ',
+  segment: 'INDICES',
+  exchange: 'NSE',
+};
+
 const trimmedInstrumentMapper = (i: Instrument) => {
   return {
+    exchange: i.exchange,
     token: Number(i.instrument_token),
     tradingsymbol: i.tradingsymbol,
   };
@@ -13,9 +29,13 @@ export const getStocks = (futTradingsymbol: string, target: number) => {
     readFileSync('instruments.json', 'utf-8')
   ) as Instrument[];
 
-  const mainStock = instruments.find(
-    (i) => i.tradingsymbol === futTradingsymbol
-  )!;
+  let mainStock: Instrument;
+
+  if (futTradingsymbol.startsWith('NIFTY')) {
+    mainStock = NIFTY50;
+  } else {
+    mainStock = instruments.find((i) => i.tradingsymbol === futTradingsymbol)!;
+  }
 
   const options = instruments.filter(
     (i) => i.name === mainStock.name && ['CE', 'PE'].includes(i.instrument_type)

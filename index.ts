@@ -19,10 +19,13 @@ app.use(express.json());
 app.post('/entry', async (req, res) => {
   res.send('Entry Request received!');
 
+  // variables needed for strategy
+  let ltp = 0;
   let nspMinusOnePEBid = 0;
+  let nspPEAsk = 0;
   let nspPlusOneCEBid = 0;
   let nspCEAsk = 0;
-  let nspPEAsk = 0;
+  let entrySatisfied = false;
   let leg1Complete = false;
   let leg2Complete = false;
   let leg3Complete = false;
@@ -39,11 +42,40 @@ app.post('/entry', async (req, res) => {
 
   console.log('req.body', req.body);
 
+  // Get nsp - 1, nsp and nsp + 1 stocks
   const { mainStock, nspMinusOnePE, nspCE, nspPE, nspPlusOneCE } = getStocks(
     stock,
     target
   );
 
+  // Get quotes and initialize variables with those values,
+  // instead of 0 and wait for change
+  const quoteParams = [mainStock, nspMinusOnePE, nspPE].map(
+    (s) => `${s.exchange}:${s.tradingsymbol}`
+  );
+  const quotes = await kc.getQuote(quoteParams);
+
+  for (const quote of Object.values(quotes)) {
+    switch (quote.instrument_token) {
+      case mainStock.token:
+        ltp = quote.last_price;
+        break;
+      case nspMinusOnePE.token:
+        if (quote?.depth?.buy?.[0]?.price) {
+          nspMinusOnePEBid = quote.depth.buy[0].price;
+        }
+        break;
+      case nspPE.token:
+        if (quote?.depth?.sell?.[0]?.price) {
+          nspPEAsk = quote.depth.sell[0].price;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Setup ticker and connect
   const ticker = new KiteTicker({
     api_key: env.API_KEY,
     access_token: accessToken,
@@ -55,38 +87,48 @@ app.post('/entry', async (req, res) => {
     console.log('Connected to Zerodha Kite Ticker!');
 
     ticker.setMode('ltp', [mainStock.token]);
-    ticker.setMode('full', [nspMinusOnePE.token, nspPlusOneCE.token]);
+    ticker.setMode('full', [nspMinusOnePE.token, nspPE.token]);
 
     ticker.on('ticks', async (ticks: any[]) => {
       for (const t of ticks) {
         switch (t.instrument_token) {
           case mainStock.token:
-            const ltp = t.last_price;
-
+            ltp = t.last_price;
+            console.log(
+              'LTP is',
+              ltp,
+              'Entry ranges are',
+              target - epd,
+              target + epd
+            );
             // Check entry condition
-            if (ltp >= target - epd && ltp <= target + epd) {
+            if (ltp >= target - epd && ltp <= target + epd && !entrySatisfied) {
               console.log('Entry condition satisfied for ltp', ltp);
+              // If any of the bid is less than 0.05, skip this one
+              if (nspMinusOnePEBid < 0.05 || nspPEAsk < 0.05) {
+                continue;
+              }
+              // All is good, proceed to order
+              entrySatisfied = true;
               try {
                 console.log(
                   `Placing BUY order for ${
                     nspMinusOnePE.tradingsymbol
                   } at price ${nspMinusOnePEBid - lpd} and quantity ${
-                    quantity * 8
+                    quantity * 6
                   }`
                 );
                 console.log(
-                  `Placing BUY order for ${
-                    nspPlusOneCE.tradingsymbol
-                  } at price ${nspPlusOneCEBid - lpd} and quantity ${
-                    quantity * 8
-                  }`
+                  `Placing SELL order for ${nspPE.tradingsymbol} at price ${
+                    nspPEAsk + lpd
+                  } and quantity ${quantity}`
                 );
                 const orderResults = await Promise.all([
                   kc.placeOrder('regular', {
                     exchange: 'NFO',
                     order_type: 'LIMIT',
                     product: 'NRML',
-                    quantity: quantity * 8,
+                    quantity: quantity * 6,
                     tradingsymbol: nspMinusOnePE.tradingsymbol,
                     transaction_type: 'BUY',
                     price: nspMinusOnePEBid - lpd,
@@ -95,19 +137,19 @@ app.post('/entry', async (req, res) => {
                     exchange: 'NFO',
                     order_type: 'LIMIT',
                     product: 'NRML',
-                    quantity: quantity * 8,
-                    tradingsymbol: nspPlusOneCE.tradingsymbol,
-                    transaction_type: 'BUY',
-                    price: nspPlusOneCEBid - lpd,
+                    quantity: quantity,
+                    tradingsymbol: nspPE.tradingsymbol,
+                    transaction_type: 'SELL',
+                    price: nspPEAsk + lpd,
                   }),
                 ]);
                 console.log(
-                  'Leg 1 and Leg 2 orders placed successfully!',
+                  'PUT Buy and PUT Sell orders placed successfully!',
                   orderResults
                 );
               } catch (error) {
                 console.error(
-                  'Error occured while placing Leg 1 and Leg 2 orders. Exiting...',
+                  'Error occured while placing PUT Buy and PUT Sell orders. Exiting...',
                   error
                 );
                 process.exit(1);
@@ -116,21 +158,44 @@ app.post('/entry', async (req, res) => {
               ticker.unsubscribe([
                 mainStock.token,
                 nspMinusOnePE.token,
-                nspPlusOneCE.token,
+                nspPE.token,
               ]);
-              ticker.setMode('full', [nspCE.token, nspPE.token]);
+
+              const quoteParams = [nspPlusOneCE, nspCE].map(
+                (s) => `${s.exchange}:${s.tradingsymbol}`
+              );
+              const quotes = await kc.getQuote(quoteParams);
+
+              for (const quote of Object.values(quotes)) {
+                switch (quote.instrument_token) {
+                  case nspPlusOneCE.token:
+                    if (quote?.depth?.buy?.[0]?.price) {
+                      nspPlusOneCEBid = quote.depth.buy[0].price;
+                    }
+                    break;
+                  case nspCE.token:
+                    if (quote?.depth?.sell?.[0]?.price) {
+                      nspCEAsk = quote.depth.sell[0].price;
+                    }
+                    break;
+                  default:
+                    break;
+                }
+              }
+
+              ticker.setMode('full', [nspPlusOneCE.token, nspCE.token]);
 
               ticker.on('ticks', (ticks: any) => {
                 for (const t of ticks) {
                   switch (t.instrument_token) {
+                    case nspPlusOneCE.token:
+                      if (t?.depth?.buy?.[0]?.price) {
+                        nspPlusOneCEBid = t.depth.buy[0].price;
+                      }
+                      break;
                     case nspCE.token:
                       if (t?.depth?.sell?.[0]?.price) {
                         nspCEAsk = t.depth.sell[0].price;
-                      }
-                      break;
-                    case nspPE.token:
-                      if (t?.depth?.sell?.[0]?.price) {
-                        nspPEAsk = t.depth.sell[0].price;
                       }
                       break;
                   }
@@ -141,28 +206,37 @@ app.post('/entry', async (req, res) => {
                 if (orderUpdate.status === 'COMPLETE') {
                   if (orderUpdate.instrument_token === nspMinusOnePE.token) {
                     leg1Complete = true;
-                    console.log('Leg 1 order completed!');
-                  } else if (
-                    orderUpdate.instrument_token === nspPlusOneCE.token
-                  ) {
+                    console.log('PUT Buy order completed!');
+                  } else if (orderUpdate.instrument_token === nspPE.token) {
                     leg2Complete = true;
-                    console.log('Leg 2 order completed!');
+                    console.log('PUT Sell order completed!');
                   }
 
                   if (leg1Complete && leg2Complete) {
-                    console.log('Both Leg 1 and Leg 2 orders completed!');
+                    console.log('Both PUT Buy and PUT Sell orders completed!');
                     try {
+                      console.log(
+                        `Placing BUY order for ${
+                          nspPlusOneCE.tradingsymbol
+                        } at price ${nspPlusOneCEBid - lpd} and quantity ${
+                          quantity * 6
+                        }`
+                      );
                       console.log(
                         `Placing SELL order for ${
                           nspCE.tradingsymbol
                         } at price ${nspCEAsk + lpd} and quantity ${quantity}`
                       );
-                      console.log(
-                        `Placing SELL order for ${
-                          nspPE.tradingsymbol
-                        } at price ${nspPEAsk + lpd} and quantity ${quantity}`
-                      );
                       const orderResults = await Promise.all([
+                        kc.placeOrder('regular', {
+                          exchange: 'NFO',
+                          order_type: 'LIMIT',
+                          product: 'NRML',
+                          quantity: quantity * 6,
+                          tradingsymbol: nspPlusOneCE.tradingsymbol,
+                          transaction_type: 'BUY',
+                          price: nspPlusOneCEBid - lpd,
+                        }),
                         kc.placeOrder('regular', {
                           exchange: 'NFO',
                           order_type: 'LIMIT',
@@ -172,44 +246,37 @@ app.post('/entry', async (req, res) => {
                           transaction_type: 'SELL',
                           price: nspCEAsk + lpd,
                         }),
-                        kc.placeOrder('regular', {
-                          exchange: 'NFO',
-                          order_type: 'LIMIT',
-                          product: 'NRML',
-                          quantity: quantity,
-                          tradingsymbol: nspPE.tradingsymbol,
-                          transaction_type: 'SELL',
-                          price: nspPEAsk + lpd,
-                        }),
                       ]);
                       console.log(
-                        'Leg 3 and Leg 4 orders placed successfully!',
+                        'CALL Buy and CALL Sell orders placed successfully!',
                         orderResults
                       );
                     } catch (error) {
                       console.error(
-                        'Error occured while placing Leg 3 and Leg 4 orders. Exiting...',
+                        'Error occured while placing CALL Buy and CALL Sell orders. Exiting...',
                         error
                       );
                       process.exit(1);
                     }
-                    ticker.unsubscribe([nspCE.token, nspPE.token]);
+                    ticker.unsubscribe([nspPlusOneCE.token, nspCE.token]);
 
                     ticker.on('order_update', async (orderUpdate: any) => {
                       if (orderUpdate.status === 'COMPLETE') {
-                        if (orderUpdate.instrument_token === nspCE.token) {
+                        if (
+                          orderUpdate.instrument_token === nspPlusOneCE.token
+                        ) {
                           leg3Complete = true;
-                          console.log('Leg 3 order completed!');
+                          console.log('CALL Buy order completed!');
                         } else if (
-                          orderUpdate.instrument_token === nspPE.token
+                          orderUpdate.instrument_token === nspCE.token
                         ) {
                           leg4Complete = true;
-                          console.log('Leg 4 order completed!');
+                          console.log('CALL Sell order completed!');
                         }
 
                         if (leg3Complete && leg4Complete) {
                           console.log(
-                            'Both Leg 3 and Leg 4 orders completed! Entry completed!'
+                            'Both CALL Buy and CALL Sell orders completed! Entry completed!'
                           );
                           console.log(
                             'Please trigger exit strategy. Exiting...'
@@ -228,9 +295,9 @@ app.post('/entry', async (req, res) => {
               nspMinusOnePEBid = t.depth.buy[0].price;
             }
             break;
-          case nspPlusOneCE.token:
-            if (t?.depth?.buy?.[0]?.price) {
-              nspPlusOneCEBid = t.depth.buy[0].price;
+          case nspPE.token:
+            if (t?.depth?.sell?.[0]?.price) {
+              nspPEAsk = t.depth.sell[0].price;
             }
             break;
           default:
@@ -261,6 +328,41 @@ app.post('/exit', async (req, res) => {
     stock,
     target
   );
+
+  // Get quotes and initialize variables with those values,
+  // instead of 0 and wait for change
+  const quoteParams = [nspMinusOnePE, nspCE, nspPE, nspPlusOneCE].map(
+    (s) => `${s.exchange}:${s.tradingsymbol}`
+  );
+  const quotes = await kc.getQuote(quoteParams);
+
+  for (const quote of Object.values(quotes)) {
+    switch (quote.instrument_token) {
+      case nspMinusOnePE.token:
+        if (quote?.depth?.sell?.[0]?.price) {
+          nspMinusOnePEAsk = quote.depth.sell[0].price;
+        }
+        break;
+      case nspPE.token:
+        if (quote?.depth?.buy?.[0]?.price) {
+          nspPEBid = quote.depth.buy[0].price;
+        }
+        break;
+      case nspPlusOneCE.token:
+        if (quote?.depth?.sell?.[0]?.price) {
+          nspPlusOneCEAsk = quote.depth.sell[0].price;
+        }
+        break;
+      case nspCE.token:
+        if (quote?.depth?.buy?.[0]?.price) {
+          nspCEBid = quote.depth.buy[0].price;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   const tokensToSubscribe = [
     nspMinusOnePE.token,
     nspCE.token,
@@ -326,12 +428,12 @@ app.post('/exit', async (req, res) => {
           console.log(
             `Placing SELL order for ${nspMinusOnePE.tradingsymbol} at price ${
               nspMinusOnePEAsk + epd
-            } and quantity ${quantity * 8}`
+            } and quantity ${quantity * 6}`
           );
           console.log(
             `Placing SELL order for ${nspPlusOneCE.tradingsymbol} at price ${
               nspPlusOneCEAsk + epd
-            } and quantity ${quantity * 8}`
+            } and quantity ${quantity * 6}`
           );
           console.log(
             `Placing BUY order for ${nspCE.tradingsymbol} at price ${
@@ -348,7 +450,7 @@ app.post('/exit', async (req, res) => {
               exchange: 'NFO',
               order_type: 'LIMIT',
               product: 'NRML',
-              quantity: quantity * 8,
+              quantity: quantity * 6,
               tradingsymbol: nspMinusOnePE.tradingsymbol,
               transaction_type: 'SELL',
               price: nspMinusOnePEAsk + epd,
@@ -357,7 +459,7 @@ app.post('/exit', async (req, res) => {
               exchange: 'NFO',
               order_type: 'LIMIT',
               product: 'NRML',
-              quantity: quantity * 8,
+              quantity: quantity * 6,
               tradingsymbol: nspPlusOneCE.tradingsymbol,
               transaction_type: 'SELL',
               price: nspPlusOneCEAsk + epd,
